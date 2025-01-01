@@ -7,7 +7,7 @@ from simulation import Simulation
 # Initialize Pygame
 pygame.init()
 
-# Set up the display
+# Set up the displachat
 width, height = 800, 800
 window = pygame.display.set_mode((width, height))
 pygame.display.set_caption('Solar system')
