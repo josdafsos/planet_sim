@@ -14,7 +14,7 @@ width, height = 800, 800
 window = pygame.display.set_mode((width, height))
 pygame.display.set_caption('Solar system')
 
-          
+print("testing git things")          
 
 center_x_vis = width/2
 center_y_vis = height/2
