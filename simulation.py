@@ -7,7 +7,7 @@ import threading
 # Define Body class
 class Body: 
 
-    radius_scaler = None
+    # radius_scaler = None
 
     @staticmethod
     def init_static_properties(width):
