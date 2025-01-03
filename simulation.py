@@ -3,6 +3,8 @@ import numpy as np
 from collections import deque
 import time
 import threading
+from scipy.spatial.distance import cdist
+import gymnasium as gym
 
 # Define Body class
 class Body: 
@@ -51,23 +53,23 @@ class Body:
                           points = self.path_vis) 
 
 
-class Simulation:
+class Simulation(gym.Env):
 
     width = None
+    height = None
     max_distance = None  
-    pix_to_m = None         
+    pix_to_m = None
+    G_const = 6.67e-11  # gravitational constant, N*m^2*kg^-2
 
     @staticmethod
-    def init_static_params(width):
+    def init_static_params(width, height):
         Simulation.width = width
+        Simulation.height = height
         Simulation.max_distance = 228e9                            # maximum distance (Mars to SUn) in meters
         Simulation.max_distance = 1.1*Simulation.max_distance                 # maximum distance in meters
         Simulation.pix_to_m = Simulation.max_distance/(Simulation.width/2)           # conversion of pixels to km
-        
 
-    G_const = 6.67e-11                        # gravitational constant, N*m^2*kg^-2
-    
-    def __init__(self, window=None, dt=60*60*24, compute_alg="old", logic_fps=1000):
+    def __init__(self, window=None, dt=60*60*24, compute_alg="old", logic_fps=1000, init_func=None):
         """
         :param window: used to define in which window the drawing will occur.If window is None (default) the nothing will be drawn
         :param compute_alg: "vec" or "old" sets the algorith to be used for physics computation. Old is initial alg and vec is the new one
@@ -94,11 +96,44 @@ class Simulation:
         self.logic_fps = logic_fps
         self.current_time = time.time()
         self.last_logic_update_time = time.time()
+        self.init_func = init_func  # function used to generate bodies on reset
+        self.mass_vec = None
+        self.pos_vec = None
+        self.vel_vec = None
+        self.acc_vec = None
 
     def run_in_thread(self):
         simulatiom_thread = threading.Thread(target=self._thread_run)
         simulatiom_thread.daemon = True  # Ensure the logic thread is killed when the program ends
         simulatiom_thread.start()
+
+    def _parse_body_to_vec(self, body):
+        if self.mass_vec is None:
+            self.mass_vec = np.array([[body.mass]])
+            self.pos_vec = body.pos_xy  # position in meters
+            self.vel_vec = body.vel  # velocity in kilometers per second
+            self.acc_vec = body.acc
+        else:
+            self.mass_vec = np.vstack((self.mass_vec, [body.mass]))
+            self.pos_vec = np.vstack((self.pos_vec, body.pos_xy))  # position in meters
+            self.vel_vec = np.vstack((self.vel_vec, body.vel))  # velocity in kilometers per second
+            self.acc_vec = np.vstack((self.acc_vec, body.acc))
+
+    def reset(self):
+        self.bodies = []
+        self.mass_vec = None
+        self.pos_vec = None
+        self.vel_vec = None
+        self.acc_vec = None
+
+        self.cur_time = 0
+        self.is_paused = True
+        self.is_running = True  # kills multithread if false (redesign the name)
+
+        if self.init_func is not None:
+            self.bodies = self.init_func(Simulation.width, Simulation.height)
+        for body in self.bodies:
+            self._parse_body_to_vec(body)
 
     def _thread_run(self):
         while self.is_running:
@@ -111,13 +146,26 @@ class Simulation:
     def add_body(self, body=None, bodies=None):
         if body is not None:
             self.bodies.append(body)
+            self._parse_body_to_vec(body)
         elif bodies is not None:
             self.bodies.extend(bodies)
+            for body in bodies:
+                self._parse_body_to_vec(body)
         else:
             print("Error, body was not provided correctly")
 
     def _vec_physics_compute(self):
-        pass
+
+        # Compute squared distances directly
+        distances = cdist(self.pos_vec, self.pos_vec, 'sqeuclidean')
+
+        # Compute the inverse square distances
+        # If the distance is zero, inverse sqrt is set to zero
+        inverse_square_distances = np.where(np.abs(distances) > 1e-3, 1 / distances, 0)
+        #print(inverse_square_distances)
+        mass_mat = np.matmul(self.mass_vec, np.transpose(self.mass_vec))
+        gravity_force_mat = np.matmul(mass_mat, inverse_square_distances) * Simulation.G_const
+
 
     def _old_physics_compute(self):
         for ind_1 in range(0, len(self.bodies)):
@@ -176,11 +224,14 @@ class Simulation:
                 text = self.font.render(message, True, (255, 255, 255))  # White text
             self.window.blit(text, (10, 20 + 30*i))
 
-    def draw_all(self):
+    def render(self):  # function to visualize the simulation, name
         if self.window is not None:  # if it is none, the visualization is skipped for faster computations
             for body in self.bodies:
                 body.draw(self.window)
                 body.draw_path(self.window)
         self._draw_info()
+
+    def close(self):  # used in gym environment for RL training
+        pass
 
 
