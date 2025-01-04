@@ -2,6 +2,7 @@ import numpy as np
 import pygame
 import sys
 from simulation import Body
+from simulation import Solar_system
 from simulation import Simulation
 
 import time
@@ -14,15 +15,8 @@ width, height = 800, 800
 window = pygame.display.set_mode((width, height))
 pygame.display.set_caption('Solar system')
 
-print("testing git things")          
-
 center_x_vis = width/2
 center_y_vis = height/2
-
-max_distance = 228e9                            # maximum distance (Mars to SUn) in meters
-max_distance = 1.1*max_distance                 # maximum distance in meters
-pix_to_m = max_distance/(width/2)               # conversion of pixels to km
-
 
 # Define instances of planets
 bodies = [
