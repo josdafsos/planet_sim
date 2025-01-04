@@ -211,7 +211,6 @@ class Simulation:
         for ind_3 in range(0, len(self.bodies)):
             self.bodies[ind_3].acc = self.bodies[ind_3].d2xd2y_int
             self.bodies[ind_3].update_position(Solar_system.distance_scaler, dt=self.dt)
-            #self.bodies[ind_3].draw_path(self.window)
 
     def step(self):
         if self.is_paused:
@@ -243,9 +242,6 @@ class Simulation:
             Solar_system.draw_bodies(self.window, self.bodies)
             Solar_system.draw_trajectories(self.window, self.bodies)
             
-            """ for body in self.bodies:
-                body.draw(self.window)
-                body.draw_path(self.window) """
         self._draw_info()
 
 
