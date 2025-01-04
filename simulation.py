@@ -23,8 +23,8 @@ class Body:
         self.pos_xy         = None                      # position in meters
         self.pos_xy_vis     = None                      # position in pixels (for visualization) 
         self.radius_vis     = None                      # radius in pixels (for visualization)
-        self.path_vis       = deque(maxlen=24*1000)        # visualizaed trajectory of the body in pixels (for visualization)
-
+        self.path_vis       = deque(maxlen=24*1000)     # visualizaed trajectory of the body in pixels (for visualization)
+        self.acc            = np.array([0, 0])
 
     def update_position(self, distance_scaler, dt):
         self.vel        = self.vel + self.acc * dt
@@ -131,7 +131,7 @@ class Simulation:
 
     G_const = 6.67e-11                        # gravitational constant, N*m^2*kg^-2
     
-    def __init__(self, window=None, dt=60*60, compute_alg="old", logic_fps=1000):
+    def __init__(self, window=None, dt=60*60, compute_alg="old", logic_fps=1000, init_func = None):
         """
         :param window: used to define in which window the drawing will occur.If window is None (default) the nothing will be drawn
         :param compute_alg: "vec" or "old" sets the algorith to be used for physics computation. Old is initial alg and vec is the new one

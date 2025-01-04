@@ -1,4 +1,5 @@
 import pygame
+import numpy as np
 import sys
 from simulation import Body
 from simulation import Solar_system
@@ -105,7 +106,8 @@ def main_loop():
     button_pressed = None
     running = True
 
-    simulation.reset()
+    # simulation.reset() <--- Question from Pavel: this command was commented out because it removed all instances of "body" from the "simulation" object
+    
     simulation.run_in_thread()  # runs the game logic in a separate thread
     # use simulation.logic_fps = 100 # to change computation frequency
     simulation.logic_fps = 1000
@@ -128,7 +130,7 @@ def main_loop():
         # drawing section:
 
         window.fill((255, 255, 255))  # Clear the screen
-        simulation.draw_all()
+        simulation.render()
 
         # Flip the display
         pygame.display.flip()
