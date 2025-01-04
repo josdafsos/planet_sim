@@ -21,69 +21,84 @@ center_y_vis = height/2
 
 max_distance = 228e9                            # maximum distance (Mars to SUn) in meters
 max_distance = 1.1*max_distance                 # maximum distance in meters
-pix_to_m = max_distance/(width/2)           # conversion of pixels to km
+pix_to_m = max_distance/(width/2)               # conversion of pixels to km
 
 
-
-rot_vel_venus   = 35e3                            # Venus rotational velocity around Sun, m/s  
-rot_vel_mercury = 47e3                            # Mercury rotational velocity around Sun, m/s  
-rot_vel_earth   = 30e3                            # Earth tangential velocity around Sun, m/s
-rot_vel_moon    = rot_vel_earth + 1.022e3         # Moons tangential velocity around Sun, m/s
-rot_vel_mars    = 24e3                            # Mars tangential velocity around Sun, m/s
-
-Simulation.init_static_params(width)
-Body.init_static_properties(width)
-simulation = Simulation(window=window)
-
-# Define instances of bodies
+# Define instances of planets
 bodies = [
-    Body(name       = 'Sun', 
-               color      = (252, 229, 112), 
-               radius     = 696e6*10,         # radius adjusted by 10 for visualization
-               mass       = 2e30,                        
-               pos_xy_vis = np.array([center_x_vis, center_y_vis]),
-               pos_xy     = np.array([max_distance, 0])),
+    Body(      name       = 'Sun', 
+               color        = (252, 229, 112), 
+               radius       = 696e6,                       
+               mass         = 2e30, 
+               orb_vel_in   = np.array([0,0]),
+               satellite_of = None, 
+               orbit_radius = None),
     
-    Body(name       = 'Venus', 
-               color      = (255, 198, 73), 
-               radius     = 6.05e6*500,        # radius adjusted by 500 for visualization
-               mass       = 4.57e24,                        
-               pos_xy_vis = np.array([center_x_vis - 108.2e9/pix_to_m, height/2]),
-               pos_xy     = np.array([max_distance - 108.2e9,0]),
-               vel = [0, rot_vel_venus]),
+    Body(      name         = 'Venus', 
+               color        = (255, 198, 73), 
+               radius       = 6.05e6,        
+               mass         = 4.57e24,                        
+               orb_vel_in   = np.array([0, 35.02e3]),
+               satellite_of = None,
+               orbit_radius = 108e9),
 
-    Body(name       ='Mercury', 
-               color      = (183, 184, 185), 
-               radius     = 2.44e6*1000,       # radius adjusted by 500 for visualization
-               mass       = 3.3e23,
-               pos_xy_vis = np.array([center_x_vis - 57.9e9/pix_to_m, height/2]),
-               pos_xy     = np.array([max_distance - 57.9e9,0]),
-               vel = [0, rot_vel_mercury]),
+    Body(      name         ='Mercury', 
+               color        = (183, 184, 185), 
+               radius       = 2.44e6,       
+               mass         = 3.3e23,
+               orb_vel_in   = np.array([0,47.36e3]),
+               satellite_of = None, 
+               orbit_radius = 58e9),
 
-    Body(name       ='Earth', 
-               color      = (0,94,184), 
-               radius     = 6371e3*500,       # radius adjusted by 500 for visualization
-               mass       = 5.97e24,
-               pos_xy_vis = np.array([center_x_vis - 149e9/pix_to_m, height/2]),
-               pos_xy     = np.array([max_distance - 149e9,0]),
-               vel = [0, rot_vel_earth]),
+    Body(      name         = 'Earth', 
+               color        = (0,94,184), 
+               radius       = 6.371e6,       
+               mass         = 5.97e24,
+               orb_vel_in   = np.array([0,29.8e3]),
+               satellite_of = None, 
+               orbit_radius = 1.5e11),
 
-    Body(name       ='Moon', 
-               color      = (246, 241, 213), 
-               radius     = 1737e3*200*2,       # radius adjusted by 200 for visualization
-               mass       = 7.35e22,
-               pos_xy_vis = np.array([center_x_vis - (149e9+384.4e6)/pix_to_m, height/2]),
-               pos_xy     = np.array([max_distance - (149e9+384.4e6),0]),
-               vel= [0, rot_vel_moon]),
-
-    Body(name       ='Mars', 
-               color      = (156, 46, 53), 
-               radius     = 3.4e6*500,       # radius adjusted by 500 for visualization
-               mass       = 6.42e23,
-               pos_xy_vis = np.array([center_x_vis - (228e9)/pix_to_m, height/2]),
-               pos_xy     = np.array([max_distance - (228e9),0]),
-               vel= [0, rot_vel_mars]),
+    Body(      name         = 'Mars', 
+               color        = (156, 46, 53), 
+               radius       = 3.4e6,       
+               mass         = 6.42e23,
+               orb_vel_in   = np.array([0,24.08e3]),
+               satellite_of = None, 
+               orbit_radius = 228e9),
 ]
+
+
+# Define instances of satellites
+bodies.extend([
+    Body(      name         = 'Moon', 
+               color        = (246, 241, 213), 
+               radius       = 1737e3,       
+               mass         = 7.35e22,
+               orb_vel_in   = np.array([0,1.022e3]), 
+               satellite_of = next((body for body in bodies if body.name == "Earth"), None),
+               orbit_radius = 384.4e6),
+
+    Body(      name         = 'Phobos', 
+               color        = (0, 0, 0),                
+               radius       = 11.1e3,       
+               mass         = 1.06e16,
+               orb_vel_in   = np.array([0,2.14e3]),                
+               satellite_of = next((body for body in bodies if body.name == "Mars"), None),
+               orbit_radius = 9.6e6),
+
+    Body(      name         = 'Deimos', 
+               color        = (158,143,179), 
+               radius       = 6.2e3,       
+               mass         = 1.5e15,
+               orb_vel_in   = np.array([0,1.35e3]), 
+               satellite_of = next((body for body in bodies if body.name == "Mars"), None),
+               orbit_radius = 23.46e6)
+               
+])
+
+
+Solar_system.initiate_system(width, height, bodies)
+simulation = Simulation(window=window)
 
 simulation.add_body(bodies=bodies)
 simulation.add_info("days")
@@ -111,12 +126,13 @@ def main_loop():
                     print("space is released")
                     if button_pressed is None:
                         button_pressed = False
+                        Solar_system.initiate_movement(bodies)
                     else:
                         button_pressed = not button_pressed
                     simulation.is_paused = button_pressed
 
         # drawing section:
-        window.fill((0, 0, 0))  # Clear the screen
+        window.fill((255, 255, 255))  # Clear the screen
         simulation.draw_all()
 
         # Flip the display
