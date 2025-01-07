@@ -14,7 +14,6 @@ width, height = 700, 700
 window = pygame.display.set_mode((width, height))
 pygame.display.set_caption('Solar system')
 
-print('testing how git works on mac OS')
 
 center_x_vis = width/2
 center_y_vis = height/2
