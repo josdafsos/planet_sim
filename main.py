@@ -12,13 +12,11 @@ width, height = 700, 700
 window = pygame.display.set_mode((width, height))
 pygame.display.set_caption('Solar system')
 
-          
-
 
 Simulation.init_static_params(width, height)
 Body.init_static_properties(width)
 simulation = Simulation(window=window,
-                        compute_alg="old",  # use "old" for the initial algorithm
+                        compute_alg="vec",  # use "old" for the initial algorithm
                         init_func=body_system.create_solar_system)
 #simulation = Simulation(window=window, init_func=body_system.create_three_body_system)
 

@@ -69,7 +69,13 @@ class Simulation(gym.Env):
         Simulation.max_distance = 1.1*Simulation.max_distance                 # maximum distance in meters
         Simulation.pix_to_m = Simulation.max_distance/(Simulation.width/2)           # conversion of pixels to km
 
-    def __init__(self, window=None, dt=60*60*24, compute_alg="old", logic_fps=1000, init_func=None):
+    def __init__(self,
+                 window=None,
+                 dt=60*60*24,
+                 compute_alg="old",
+                 solver="newton",
+                 logic_fps=1000,
+                 init_func=None):
         """
         :param window: used to define in which window the drawing will occur.If window is None (default) the nothing will be drawn
         :param compute_alg: "vec" or "old" sets the algorith to be used for physics computation. Old is initial alg and vec is the new one
@@ -79,6 +85,10 @@ class Simulation(gym.Env):
         self.dt = dt  # dt is in seconds
         self.cur_time = 0
         self.window = window
+        if solver == "newton":  # type of differential equation diff_equation_solver
+            self.diff_equation_solver = self._newton_diff_solver
+
+
         if compute_alg == "vec":
             self.compute_physics = self._vec_physics_compute
         elif compute_alg == "old":
@@ -155,17 +165,33 @@ class Simulation(gym.Env):
             print("Error, body was not provided correctly")
 
     def _vec_physics_compute(self):
-
         # Compute squared distances directly
         distances = cdist(self.pos_vec, self.pos_vec, 'sqeuclidean')
+        cube_distances = distances**3
 
         # Compute the inverse square distances
         # If the distance is zero, inverse sqrt is set to zero
-        inverse_square_distances = np.where(np.abs(distances) > 1e-3, 1 / distances, 0)
+        inverse_cube_distances = np.where(np.abs(cube_distances) > 1e-3, 1 / cube_distances, 0)
+        g_inverse_cube_distance = inverse_cube_distances * Simulation.G_const
         #print(inverse_square_distances)
-        mass_mat = np.matmul(self.mass_vec, np.transpose(self.mass_vec))
-        gravity_force_mat = np.matmul(mass_mat, inverse_square_distances) * Simulation.G_const
+        # mass_mat = np.matmul(self.mass_vec, np.transpose(self.mass_vec))
+        # gravity_force_mat = np.matmul(mass_mat, inverse_square_distances) * Simulation.G_const
 
+        # getting direction of the force, not yet normalized. Also possible to compute a single matrix
+        # single matrix: directions = points[np.newaxis, :, :] - points[:, np.newaxis, :]
+        x_diff_matrix = self.pos_vec[:, 0][np.newaxis, :] - self.pos_vec[:, 0][:, np.newaxis]
+        y_diff_matrix = self.pos_vec[:, 1][np.newaxis, :] - self.pos_vec[:, 1][:, np.newaxis]
+
+        x_no_mass_acc = np.multiply(x_diff_matrix, g_inverse_cube_distance)
+        y_no_mass_acc = np.multiply(y_diff_matrix, g_inverse_cube_distance)
+
+        x_acc_vec = np.transpose(np.matmul(np.transpose(self.mass_vec), x_no_mass_acc))
+        y_acc_vec = np.transpose(np.matmul(np.transpose(self.mass_vec), y_no_mass_acc))
+        self.acc_vec = np.hstack((x_acc_vec, y_acc_vec))
+
+    def _newton_diff_solver(self):
+        self.vel_vec = self.acc_vec * self.dt
+        self.pos_vec = self.vel_vec * self.dt
 
     def _old_physics_compute(self):
         for ind_1 in range(0, len(self.bodies)):
@@ -203,6 +229,7 @@ class Simulation(gym.Env):
         if self.is_paused:
             return
         self.compute_physics()
+        self.diff_equation_solver()
         for body in self.bodies:
             body.track_trajectory()
         self.cur_time += self.dt
