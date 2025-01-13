@@ -12,12 +12,13 @@ width, height = 700, 700
 window = pygame.display.set_mode((width, height))
 pygame.display.set_caption('Solar system')
 
+          
+
 
 Simulation.init_static_params(width, height)
-Body.init_static_properties(width)
 simulation = Simulation(window=window,
-                        compute_alg="vec",  # use "old" for the initial algorithm
-                        init_func=body_system.create_solar_system)
+                        compute_alg="old",  # use "old" for the initial algorithm
+                        init_func=body_system.create_body_system)
 #simulation = Simulation(window=window, init_func=body_system.create_three_body_system)
 
 
@@ -26,7 +27,7 @@ simulation.add_info("days")
 
 # Initialize the clock
 clock = pygame.time.Clock()
-fps = 30          # fps set to hours
+fps = 60          # fps set to hours
 
 
 def main_loop():
@@ -53,7 +54,7 @@ def main_loop():
                     simulation.is_paused = button_pressed
 
         # drawing section:
-        window.fill((0, 0, 0))  # Clear the screen
+        window.fill((255, 255, 255))  # Clear the screen
         simulation.render()
         pygame.display.flip()  # Flip the display
         clock.tick(fps)  # Control the framerate

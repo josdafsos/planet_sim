@@ -9,34 +9,25 @@ import gymnasium as gym
 # Define Body class
 class Body: 
 
-    radius_scaler = None
+    def __init__(self, name, color, radius, mass, orbit_radius = None, orb_vel_in = None, init_func = None):
+        self.name           = name
+        self.color          = color
+        self.radius         = radius                        # radius in kilometers
+        self.mass           = mass                          # mass in kg
+        self.orbit_radius   = orbit_radius
+        self.orb_vel_in     = orb_vel_in
 
-    @staticmethod
-    def init_static_properties(width):
-        max_distance = 228e9  # maximum distance (Mars to SUn) in meters
-        max_distance = 1.1 * max_distance  # maximum distance in meters
-        Body.radius_scaler = max_distance / (width / 2)  # conversion of pixels to km
-
-    def __init__(self, name, color, radius, mass, pos_xy_vis, pos_xy, vel=np.array([0, 0]) ):
-        self.name = name
-        self.color = color
-        self.radius = radius / Body.radius_scaler            # radius in kilometers
-        self.mass = mass             # mass in kg
-        self.pos_xy_vis = np.array(pos_xy_vis)       # position in pixels
-        self.pos_xy = np.array(pos_xy)           # position in meters
-        self.vel = np.array(vel)             # velocity in kilometers per second
-        self.acc = np.array([0, 0])           # acceleration in kilometers^2 per second
-        self.d2xd2y_int = 0       # placeholder to store results of the intermediate calculations
-        self.path_vis = deque(maxlen=1000)  # change maxlen to modify the trajectory tracking
-        self.path_vis.append(self.pos_xy_vis.copy())
-        self.path_vis.append(self.pos_xy_vis.copy())  # the vector must have at least to lines to be drawn correctly
-
+        self.acc            = np.array([0,0])               # acceleration in kilometers^2 per second
+        self.vel            = np.array([0,0])               # orbital velocity of a body at in meters per second
+        self.pos_xy         = None                          # position in meters
+        self.pos_xy_vis     = None                          # position in pixels (for visualization)
+        self.radius_vis     = None                          # radius in pixels (for visualization)
+        self.path_vis       = deque(maxlen=1000)            # visualizaed trajectory of the body in pixels (for visualization)
 
         
 
     def draw(self, surface):
-        pygame.draw.circle(surface, self.color, self.pos_xy_vis, self.radius)
-
+        pygame.draw.circle(surface, self.color, self.pos_xy_vis, self.radius_vis)
 
     def update_position(self, pix_to_m, dt):
         self.vel       = self.vel + self.acc * dt
@@ -47,7 +38,8 @@ class Body:
         self.path_vis.append((self.pos_xy_vis[0], self.pos_xy_vis[1]))
 
     def draw_path(self, surface):
-        pygame.draw.lines(surface = surface, 
+        self.path_vis.append((self.pos_xy_vis[0], self.pos_xy_vis[1]))
+        pygame.draw.lines(surface = surface,
                           color = self.color,
                           closed = False, 
                           points = self.path_vis) 
@@ -57,17 +49,13 @@ class Simulation(gym.Env):
 
     width = None
     height = None
-    max_distance = None  
-    pix_to_m = None
+    distance_scaler = None
     G_const = 6.67e-11  # gravitational constant, N*m^2*kg^-2
 
     @staticmethod
     def init_static_params(width, height):
         Simulation.width = width
         Simulation.height = height
-        Simulation.max_distance = 228e9                            # maximum distance (Mars to SUn) in meters
-        Simulation.max_distance = 1.1*Simulation.max_distance                 # maximum distance in meters
-        Simulation.pix_to_m = Simulation.max_distance/(Simulation.width/2)           # conversion of pixels to km
 
     def __init__(self,
                  window=None,
@@ -141,7 +129,7 @@ class Simulation(gym.Env):
         self.is_running = True  # kills multithread if false (redesign the name)
 
         if self.init_func is not None:
-            self.bodies = self.init_func(Simulation.width, Simulation.height)
+            self.bodies, Simulation.distance_scaler = self.init_func(Simulation.width, Simulation.height)
         for body in self.bodies:
             self._parse_body_to_vec(body)
 
@@ -165,6 +153,7 @@ class Simulation(gym.Env):
             print("Error, body was not provided correctly")
 
     def _vec_physics_compute(self):
+
         # Compute squared distances directly
         distances = cdist(self.pos_vec, self.pos_vec, 'sqeuclidean')
         cube_distances = distances**3
@@ -222,8 +211,10 @@ class Simulation(gym.Env):
 
         for ind_3 in range(0, len(self.bodies)):
             self.bodies[ind_3].acc = self.bodies[ind_3].d2xd2y_int
-            self.bodies[ind_3].update_position(Simulation.pix_to_m, dt=self.dt)
-            self.bodies[ind_3].draw_path(self.window)
+
+            self.bodies[ind_3].vel        = self.bodies[ind_3].vel + self.bodies[ind_3].acc * self.dt
+            self.bodies[ind_3].pos_xy     = self.bodies[ind_3].pos_xy + self.bodies[ind_3].vel * self.dt
+
 
     def step(self):
         if self.is_paused:
@@ -254,6 +245,9 @@ class Simulation(gym.Env):
     def render(self):  # function to visualize the simulation, name
         if self.window is not None:  # if it is none, the visualization is skipped for faster computations
             for body in self.bodies:
+
+                body.pos_xy_vis = body.pos_xy / Simulation.distance_scaler
+
                 body.draw(self.window)
                 body.draw_path(self.window)
         self._draw_info()
