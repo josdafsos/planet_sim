@@ -16,9 +16,13 @@ pygame.display.set_caption('Solar system')
 
 
 Simulation.init_static_params(width, height)
+# simulation = Simulation(window=window,
+#                         compute_alg="old",  # use "old" for the initial algorithm
+#                         init_func=body_system.create_solar_system_no_scaling)
 simulation = Simulation(window=window,
                         compute_alg="old",  # use "old" for the initial algorithm
-                        init_func=body_system.create_body_system)
+                        dt=20,
+                        init_func=body_system.create_three_body_system)  # create_three_body_system   create_solar_system_no_scaling
 #simulation = Simulation(window=window, init_func=body_system.create_three_body_system)
 
 
@@ -35,6 +39,7 @@ def main_loop():
     running = True
 
     simulation.reset()
+    Body.rescale(width, height, simulation.bodies, mode="central point")
     simulation.run_in_thread()  # runs the game logic in a separate thread
     # use simulation.logic_fps = 100 # to change computation frequency
     simulation.logic_fps = 1000
@@ -54,8 +59,8 @@ def main_loop():
                     simulation.is_paused = button_pressed
 
         # drawing section:
-        window.fill((255, 255, 255))  # Clear the screen
-        simulation.render()
+        window.fill((0, 0, 0))  # Clear the screen
+        simulation.render(is_tracking=False)
         pygame.display.flip()  # Flip the display
         clock.tick(fps)  # Control the framerate
 

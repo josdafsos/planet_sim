@@ -5,11 +5,63 @@ import time
 import threading
 from scipy.spatial.distance import cdist
 import gymnasium as gym
+from scipy.spatial import distance_matrix
 
 # Define Body class
 class Body: 
 
-    def __init__(self, name, color, radius, mass, orbit_radius = None, orb_vel_in = None, init_func = None):
+
+    position_scaler = 1
+    common_radius_scaler = 1
+    offset_xy = [0, 0]
+
+    @staticmethod
+    def rescale(win_width, win_height, body_list, mode="zero_vel"):
+        """
+        Function changes position_scaler value to fit all bodies into the screen and add camera offset for tracking
+
+        :param body_list: list of bodies based on which rescaling will appear
+        :param mode: defines the algorithm to find align camera. Options: zero point, average, sliding
+        """
+        if len(body_list) < 1:
+            return
+        pos_vec = np.array([body_list[0].pos_xy])
+        vel_vec = np.array([body_list[0].vel])
+        for body in body_list:
+            pos_vec = np.vstack((pos_vec, body.pos_xy))
+            vel_vec = np.vstack((vel_vec, body.vel))
+        distances = distance_matrix(pos_vec, pos_vec)
+        max_distance = np.max(distances)
+        resolution = min(win_width, win_height)
+        max_distance = 1.1 * max_distance  # maximum distance in meters
+
+        if mode == "average":
+            Body.position_scaler = (resolution / 2) / max_distance  # conversion of pixels to km
+            x_center = Body.position_scaler * (np.min(pos_vec[:, 0]) + np.max(pos_vec[:, 0])) / 2
+            y_center = Body.position_scaler * (np.min(pos_vec[:, 1]) + np.max(pos_vec[:, 1])) / 2
+            Body.offset_xy = [x_center + win_width/2, y_center + win_height /2]
+        elif mode == "central point":
+            Body.position_scaler = (resolution / 2) / max_distance  # conversion of pixels to km
+            squared_vel = vel_vec**2
+            vel_abs = np.abs(squared_vel[:, 0] + squared_vel[:, 1])
+            index = max(np.argmin(vel_abs)-1, 0)
+            x_center = body_list[index].pos_xy[0] * Body.position_scaler
+            y_center = body_list[index].pos_xy[1] * Body.position_scaler
+            Body.offset_xy = [x_center + win_width / 2, y_center + win_height / 2]
+            #print(Body.offset_xy)
+        elif mode == "sliding":
+            old_lin_prop = 0.5  # 0.99
+            old_scaling_porp = 0.5  # 0.99
+            Body.position_scaler = old_scaling_porp * Body.position_scaler + (1 - old_scaling_porp) * (resolution / 2) / max_distance
+            x_center = Body.position_scaler * (np.min(pos_vec[:, 0]) + np.max(pos_vec[:, 0])) / 2
+            y_center = Body.position_scaler * (np.min(pos_vec[:, 1]) + np.max(pos_vec[:, 1])) / 2
+            Body.offset_xy = [old_lin_prop * Body.offset_xy[0] + (1 - old_lin_prop) * (x_center + win_width / 2),
+                              old_lin_prop * Body.offset_xy[1] + (1 - old_lin_prop) * (y_center + win_height / 2)]
+        else:
+            raise "unknown scaling mode"
+
+    def __init__(self, name, color, radius, mass, pos_xy, vel=(0, 0)):
+        orbit_radius, orb_vel_in = None, None
         self.name           = name
         self.color          = color
         self.radius         = radius                        # radius in kilometers
@@ -17,39 +69,40 @@ class Body:
         self.orbit_radius   = orbit_radius
         self.orb_vel_in     = orb_vel_in
 
-        self.acc            = np.array([0,0])               # acceleration in kilometers^2 per second
-        self.vel            = np.array([0,0])               # orbital velocity of a body at in meters per second
-        self.pos_xy         = None                          # position in meters
-        self.pos_xy_vis     = None                          # position in pixels (for visualization)
-        self.radius_vis     = None                          # radius in pixels (for visualization)
+        self.pos_xy            = np.array(pos_xy)               # acceleration in kilometers^2 per second
+        self.vel            = np.array(vel)               # orbital velocity of a body at in meters per second
+        self.acc = np.array([0, 0])
         self.path_vis       = deque(maxlen=1000)            # visualizaed trajectory of the body in pixels (for visualization)
 
         
 
     def draw(self, surface):
-        pygame.draw.circle(surface, self.color, self.pos_xy_vis, self.radius_vis)
+        pygame.draw.circle(surface,
+                           self.color,
+                           (self.pos_xy[0] * Body.position_scaler + Body.offset_xy[0],
+                            self.pos_xy[1] * Body.position_scaler + Body.offset_xy[1]),
+                           self.radius * self.common_radius_scaler)
 
     def update_position(self, pix_to_m, dt):
         self.vel       = self.vel + self.acc * dt
         self.pos_xy     = self.pos_xy + self.vel * dt
-        self.pos_xy_vis = self.pos_xy_vis + self.vel * dt / pix_to_m
-
-    def track_trajectory(self):
-        self.path_vis.append((self.pos_xy_vis[0], self.pos_xy_vis[1]))
 
     def draw_path(self, surface):
-        self.path_vis.append((self.pos_xy_vis[0], self.pos_xy_vis[1]))
+        self.path_vis.append((self.pos_xy[0], self.pos_xy[1]))
+        if len(self.path_vis) < 2:
+            return
+        scaled_path = [[point[0] * Body.position_scaler + Body.offset_xy[0], point[1] * Body.position_scaler + Body.offset_xy[1]] for point in self.path_vis]
         pygame.draw.lines(surface = surface,
                           color = self.color,
                           closed = False, 
-                          points = self.path_vis) 
+                          points = scaled_path)
 
 
 class Simulation(gym.Env):
 
     width = None
     height = None
-    distance_scaler = None
+    #distance_scaler = None
     G_const = 6.67e-11  # gravitational constant, N*m^2*kg^-2
 
     @staticmethod
@@ -129,7 +182,7 @@ class Simulation(gym.Env):
         self.is_running = True  # kills multithread if false (redesign the name)
 
         if self.init_func is not None:
-            self.bodies, Simulation.distance_scaler = self.init_func(Simulation.width, Simulation.height)
+            self.bodies = self.init_func(Simulation.width, Simulation.height)
         for body in self.bodies:
             self._parse_body_to_vec(body)
 
@@ -155,7 +208,7 @@ class Simulation(gym.Env):
     def _vec_physics_compute(self):
 
         # Compute squared distances directly
-        distances = cdist(self.pos_vec, self.pos_vec, 'sqeuclidean')
+        distances = cdist(self.pos_vec, self.pos_vec, 'sqeuclidean')  # TODO cdist does not work correctly, use other distance computation algorithm
         cube_distances = distances**3
 
         # Compute the inverse square distances
@@ -221,8 +274,8 @@ class Simulation(gym.Env):
             return
         self.compute_physics()
         self.diff_equation_solver()
-        for body in self.bodies:
-            body.track_trajectory()
+        # for body in self.bodies:
+        #     body.track_trajectory()
         self.cur_time += self.dt
 
     def add_info(self, info: str):
@@ -242,12 +295,11 @@ class Simulation(gym.Env):
                 text = self.font.render(message, True, (255, 255, 255))  # White text
             self.window.blit(text, (10, 20 + 30*i))
 
-    def render(self):  # function to visualize the simulation, name
+    def render(self, is_tracking=False):  # function to visualize the simulation, name
         if self.window is not None:  # if it is none, the visualization is skipped for faster computations
+            if is_tracking:
+                Body.rescale(self.width, self.height, self.bodies, mode="sliding")
             for body in self.bodies:
-
-                body.pos_xy_vis = body.pos_xy / Simulation.distance_scaler
-
                 body.draw(self.window)
                 body.draw_path(self.window)
         self._draw_info()
